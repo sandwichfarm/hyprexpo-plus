@@ -1,4 +1,4 @@
-> HyprExpo+ may be an ephemeral plugin, it all depends how the [PR to `hyprland-plugins`]() goes. When/if PR is accepted, this repo will be archived. Otherwise, if rejected, it will remain. It exists here to be easily installable during the interim. 
+> HyprExpo+ may be an ephemeral plugin, it all depends how the [PR to `hyprland-plugins`](https://github.com/hyprwm/hyprland-plugins/pull/507) goes. When/if PR is accepted, this repo will be archived. Otherwise, if rejected, it will remain. It exists here to be easily installable during the interim. 
 
 # HyprExpo+
 HyprExpo+ is a fork of [HyprExpo](https://github.com/hyprwm/hyprland-plugins/tree/main/hyprexpo) that adds additional functionality.
