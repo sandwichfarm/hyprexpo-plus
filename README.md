@@ -3,8 +3,8 @@
 # HyprExpo+
 HyprExpo+ is a fork of [HyprExpo](https://github.com/hyprwm/hyprland-plugins/tree/main/hyprexpo) that adds additional functionality.
 
-Uploading hyprexpo-demo.mp4…
-  
+https://github.com/user-attachments/assets/861baa26-46b6-4fa8-8d37-65cbb9ecbed4
+
 ## Config
 A great start to configure this plugin would be adding this code to the `plugin` section of your hyprland configuration file:  
 ```ini
