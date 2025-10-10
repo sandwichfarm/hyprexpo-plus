@@ -3,7 +3,7 @@
 # HyprExpo+
 HyprExpo+ is a fork of [HyprExpo](https://github.com/hyprwm/hyprland-plugins/tree/main/hyprexpo) that adds additional functionality.
 
-https://github.com/user-attachments/assets/1924c608-68ba-4410-b59a-20c2da06306a
+![HyprExpo](https://github.com/user-attachments/assets/e89df9d2-9800-4268-9929-239ad9bc3a54)
   
 ## Config
 A great start to configure this plugin would be adding this code to the `plugin` section of your hyprland configuration file:  
@@ -36,6 +36,19 @@ plugin {
         border_width = 2
         border_color_current = rgb(66ccff)
         border_color_focus = rgb(ffcc66)
+        # rounded corners for workspace tiles
+        tile_rounding = 0            # px
+        tile_rounding_power = 2.0
+        # optional state overrides
+        tile_rounding_focus = -1      # -1 = inherit
+        tile_rounding_current = -1
+        # optional drop shadow
+        tile_shadow_enable = 0
+        tile_shadow_range = 18        # blur range (px)
+        tile_shadow_color = rgba(00000066)
+        tile_shadow_opacity = 0.6
+        tile_shadow_offset_x = 0
+        tile_shadow_offset_y = 0
 
         gaps_out = 0
         # numbers (labels)
