@@ -87,7 +87,7 @@ static SHyprGradientSpec parseGradientSpec(const std::string& inRaw) {
     return spec;
 }
 
-static void renderGradientBorder(const CBox& box, int borderSize, const SHyprGradientSpec& grad) {
+static void renderGradientBorder(const CBox& box, int borderSize, const SHyprGradientSpec& grad, int round = 0) {
     if (!grad.valid || borderSize <= 0)
         return;
 
@@ -122,19 +122,26 @@ static void renderGradientBorder(const CBox& box, int borderSize, const SHyprGra
         g_pHyprOpenGL->renderRect(r, mixCol(grad.c1, grad.c2, t), {});
     };
 
-    // top and bottom bars
-    for (int i = 0; i < segW; ++i) {
-        const double sx = box.x + (double)i * (box.w / segW);
-        const double sw = (i == segW - 1) ? (box.x + box.w - sx) : (box.w / segW);
-        drawSeg(CBox{sx, box.y, sw, (double)borderSize});
-        drawSeg(CBox{sx, box.y + box.h - borderSize, sw, (double)borderSize});
+    const double cr = std::clamp((double)round, 0.0, std::min(box.w, box.h) / 2.0);
+
+    // top and bottom bars (shrink horizontally by cr)
+    if (box.w > 2 * cr) {
+        for (int i = 0; i < segW; ++i) {
+            const double sx = box.x + cr + (double)i * ((box.w - 2 * cr) / segW);
+            const double sw = (i == segW - 1) ? (box.x + box.w - cr - sx) : ((box.w - 2 * cr) / segW);
+            drawSeg(CBox{sx, box.y, sw, (double)borderSize});
+            drawSeg(CBox{sx, box.y + box.h - borderSize, sw, (double)borderSize});
+        }
     }
-    // left and right bars
-    for (int i = 0; i < segH; ++i) {
-        const double sy = box.y + (double)i * (box.h / segH);
-        const double sh = (i == segH - 1) ? (box.y + box.h - sy) : (box.h / segH);
-        drawSeg(CBox{box.x, sy, (double)borderSize, sh});
-        drawSeg(CBox{box.x + box.w - borderSize, sy, (double)borderSize, sh});
+
+    // left and right bars (shrink vertically by cr)
+    if (box.h > 2 * cr) {
+        for (int i = 0; i < segH; ++i) {
+            const double sy = box.y + cr + (double)i * ((box.h - 2 * cr) / segH);
+            const double sh = (i == segH - 1) ? (box.y + box.h - cr - sy) : ((box.h - 2 * cr) / segH);
+            drawSeg(CBox{box.x, sy, (double)borderSize, sh});
+            drawSeg(CBox{box.x + box.w - borderSize, sy, (double)borderSize, sh});
+        }
     }
 }
 
@@ -853,6 +860,10 @@ void COverview::fullRender() {
             else if ((int)id == openedID)
                 tileRound = CURRENT_ROUND_SCALED;
 
+            // clamp rounding to tile size
+            const int maxCornerPx = std::max(0, (int)std::floor(std::min(texbox.w, texbox.h) / 2.0));
+            tileRound = std::min(tileRound, maxCornerPx);
+
             // shadow
             if (**PSHADOWEN) {
                 CBox sb = texbox;
@@ -1110,7 +1121,7 @@ void COverview::fullRender() {
             const std::string specStr = isFocus ? std::string{*PBGREFOC} : std::string{*PBGRCUR};
             const auto        spec    = parseGradientSpec(specStr);
             if (spec.valid)
-                renderGradientBorder(box, BWIDTH, spec);
+                renderGradientBorder(box, BWIDTH, spec, roundScaled);
             else
                 g_pHyprOpenGL->renderBorder(box, colFallback, {.round = roundScaled, .roundingPower = ROUND_PWR, .borderSize = BWIDTH});
         } else if (style == "hypr") {
