@@ -5,7 +5,7 @@ HyprExpo+ is a fork of [HyprExpo](https://github.com/hyprwm/hyprland-plugins/tre
 
 https://github.com/user-attachments/assets/861baa26-46b6-4fa8-8d37-65cbb9ecbed4
 
-## Config
+## Getting Started
 A great start to configure this plugin would be adding this code to the `plugin` section of your hyprland configuration file:  
 ```ini
 # .config/hypr/hyprland.conf
@@ -22,84 +22,75 @@ plugin {
 }
 ```
 
-Keyboard navigation (optional):
-```ini
-# Enable keyboard navigation + numbering and borders
-plugin {
-    hyprexpo {
-        keynav_enable = 1
-        keynav_wrap_h = 1           # wrap horizontally at row edges
-        keynav_wrap_v = 1           # wrap vertically at column edges
-        # set to 1 to enable row-major horizontal moves
-        keynav_reading_order = 0
-        border_style = simple         # or hypr (multi-layer) or hyprland (2-color + angle)
-        border_width = 2
-        border_color_current = rgb(66ccff)
-        border_color_focus = rgb(ffcc66)
-        # rounded corners for workspace tiles
-        tile_rounding = 0            # px
-        tile_rounding_power = 2.0
-        # optional state overrides
-        tile_rounding_focus = -1      # -1 = inherit
-        tile_rounding_current = -1
-        # optional drop shadow
-        tile_shadow_enable = 0
-        tile_shadow_range = 18        # blur range (px)
-        tile_shadow_color = rgba(00000066)
-        tile_shadow_opacity = 0.6
-        tile_shadow_offset_x = 0
-        tile_shadow_offset_y = 0
+### Configuration
 
-        gaps_out = 0
-        # numbers (labels)
-        label_enable = 1
-        label_font_size = 16
-        # content mode: token (default) | id | index
-        label_text_mode = token
-        # positioning
-        label_position = top-left   # top-left|top-right|bottom-left|bottom-right|center
-        label_offset_x = 6
-        label_offset_y = 6
-        # visibility behavior
-        label_show = always         # always|hover|focus|hover+focus|current+focus|never
-        # colors (per state)
-        label_color_default = rgb(ffffff)
-        label_color_hover   = rgb(eeeeee)
-        label_color_focus   = rgb(ffcc66)
-        label_color_current = rgb(66ccff)
-        # scale multipliers for states
-        label_scale_hover = 1.0
-        label_scale_focus = 1.0
-        # label background bubble
-        label_bg_enable = 1
-        label_bg_color = rgba(00000088)
-        label_bg_shape = circle     # circle|square|rounded
-        label_bg_rounding = 8       # used for rounded
-        label_padding = 4
-        # font + precision
-        label_font_family = Sans
-        label_font_bold = 0
-        label_font_italic = 0
-        label_text_underline = 0
-        label_text_strikethrough = 0
-        label_pixel_snap = 1
-        # optional: override tokens (up to 50, comma-separated). Empty entries allowed.
-        # label_token_map = "1,2,3,4,5,6,7,8,9,0,!,@,#,$,%,^,&,*,(,),a,b,c,..."
-    }
-}
-```
+#### Layout & Display
 
-### Properties
-
-| property | type | description | default |
+| key | type | description | default |
 | --- | --- | --- | --- |
-columns | number | how many desktops are displayed on one line | `3`
-gaps_in | number | inner gaps between tiles | `5`
-gaps_out | number | outer margin around the grid | `0`
-bg_col | color | color in gaps (between desktops) | `rgb(111111)`
-workspace_method | [center/first] [workspace] | position of the desktops | `center current`
-skip_empty | boolean | whether the grid displays workspaces sequentially by id using selector "r" (`false`) or skips empty workspaces using selector "m" (`true`) | `false`
-gesture_distance | number | how far is the max for the gesture | `200`
+| `plugin:hyprexpo:columns` | int | how many desktops per row | `3` |
+| `plugin:hyprexpo:gaps_in` | int | inner gaps between tiles (px) | `5` |
+| `plugin:hyprexpo:gaps_out` | int | outer margin around the grid (px) | `0` |
+| `plugin:hyprexpo:bg_col` | color | grid background color | `rgb(111111)` |
+| `plugin:hyprexpo:workspace_method` | string | placement: `center current` or `first <ws>` | `center current` |
+| `plugin:hyprexpo:skip_empty` | bool (int) | skip empty workspaces (`1`) or not (`0`) | `0` |
+| `plugin:hyprexpo:gesture_distance` | int | swipe distance considered "max" (px) | `200` |
+
+#### Tile Appearance
+
+| key | type | description | default |
+| --- | --- | --- | --- |
+| `plugin:hyprexpo:tile_rounding` | int | corner radius (px) | `0` |
+| `plugin:hyprexpo:tile_rounding_power` | float | rounding power (curve exponent) | `2.0` |
+| `plugin:hyprexpo:tile_rounding_focus` | int | focus tile radius (`-1` = inherit) | `-1` |
+| `plugin:hyprexpo:tile_rounding_current` | int | current tile radius (`-1` = inherit) | `-1` |
+| `plugin:hyprexpo:border_style` | string | `simple` \| `hypr` \| `hyprland` | `simple` |
+| `plugin:hyprexpo:border_width` | int | border thickness (px) | `2` |
+| `plugin:hyprexpo:border_color_current` | color | color for current tile border (fallback) | `rgb(66ccff)` |
+| `plugin:hyprexpo:border_color_focus` | color | color for focus tile border (fallback) | `rgb(ffcc66)` |
+| `plugin:hyprexpo:border_grad_current` | string | hyprland gradient for current, e.g. `rgba(33ccffee) rgba(00ff99ee) 45deg` | empty |
+| `plugin:hyprexpo:border_grad_focus` | string | hyprland gradient for focus | empty |
+
+#### Labels
+
+| key | type | description | default |
+| --- | --- | --- | --- |
+| `plugin:hyprexpo:label_enable` | bool (int) | enable labels | `1` |
+| `plugin:hyprexpo:label_text_mode` | string | `token` | `index` | `id` | `token` |
+| `plugin:hyprexpo:label_token_map` | string | override up to 50 tokens (comma‑sep). Empty entries skip | empty |
+| `plugin:hyprexpo:label_font_size` | int | base font size (px) | `16` |
+| `plugin:hyprexpo:label_position` | string | `top-left` | `top-right` | `bottom-left` | `bottom-right` | `center` | `center` |
+| `plugin:hyprexpo:label_offset_x` | int | offset from position anchor (px) | `0` |
+| `plugin:hyprexpo:label_offset_y` | int | offset from position anchor (px) | `0` |
+| `plugin:hyprexpo:label_show` | string | `always` | `hover` | `focus` | `hover+focus` | `current+focus` | `never` | `always` |
+| `plugin:hyprexpo:label_color_default` | color | default label color | `rgb(ffffff)` |
+| `plugin:hyprexpo:label_color_hover` | color | hover label color | `rgb(eeeeee)` |
+| `plugin:hyprexpo:label_color_focus` | color | focus label color | `rgb(ffcc66)` |
+| `plugin:hyprexpo:label_color_current` | color | current label color | `rgb(66ccff)` |
+| `plugin:hyprexpo:label_scale_hover` | float | scale multiplier on hover | `1.0` |
+| `plugin:hyprexpo:label_scale_focus` | float | scale multiplier on focus | `1.0` |
+| `plugin:hyprexpo:label_bg_enable` | bool (int) | draw background “bubble” | `1` |
+| `plugin:hyprexpo:label_bg_shape` | string | `circle` | `square` | `rounded` | `circle` |
+| `plugin:hyprexpo:label_bg_rounding` | int | radius for `rounded` shape (px) | `8` |
+| `plugin:hyprexpo:label_bg_color` | color | bubble color | `rgba(00000088)` |
+| `plugin:hyprexpo:label_padding` | int | bubble padding (px) | `8` |
+| `plugin:hyprexpo:label_font_family` | string | Pango font family | `Sans` |
+| `plugin:hyprexpo:label_font_bold` | bool (int) | bold | `0` |
+| `plugin:hyprexpo:label_font_italic` | bool (int) | italic | `0` |
+| `plugin:hyprexpo:label_text_underline` | bool (int) | underline | `0` |
+| `plugin:hyprexpo:label_text_strikethrough` | bool (int) | strikethrough | `0` |
+| `plugin:hyprexpo:label_pixel_snap` | bool (int) | snap to integer pixels | `1` |
+| `plugin:hyprexpo:label_center_adjust_x` | int | manual center nudge X (px) | `0` |
+| `plugin:hyprexpo:label_center_adjust_y` | int | manual center nudge Y (px) | `0` |
+
+#### Keyboard Navigation
+
+| key | type | description | default |
+| --- | --- | --- | --- |
+| `plugin:hyprexpo:keynav_enable` | bool (int) | enable keynav + auto submap | `1` |
+| `plugin:hyprexpo:keynav_wrap_h` | bool (int) | wrap horizontally | `1` |
+| `plugin:hyprexpo:keynav_wrap_v` | bool (int) | wrap vertically | `1` |
+| `plugin:hyprexpo:keynav_reading_order` | bool (int) | use row‑major for horizontal moves | `0` |
 
 ### Keywords
 
@@ -180,6 +171,66 @@ submap = hyprexpo
 submap = reset
 ```
 
+## Full Example
+```ini
+# Enable keyboard navigation + numbering and borders
+plugin {
+    hyprexpo {
+        keynav_enable = 1
+        keynav_wrap_h = 1           # wrap horizontally at row edges
+        keynav_wrap_v = 1           # wrap vertically at column edges
+        # set to 1 to enable row-major horizontal moves
+        keynav_reading_order = 0
+        border_style = simple         # or hypr (multi-layer) or hyprland (2-color + angle)
+        border_width = 2
+        border_color_current = rgb(66ccff)
+        border_color_focus = rgb(ffcc66)
+        # rounded corners for workspace tiles
+        tile_rounding = 0            # px
+        tile_rounding_power = 2.0
+        # optional state overrides
+        tile_rounding_focus = -1      # -1 = inherit
+        tile_rounding_current = -1
+
+        gaps_out = 0
+        # numbers (labels)
+        label_enable = 1
+        label_font_size = 16
+        # content mode: token (default) | id | index
+        label_text_mode = token
+        # positioning
+        label_position = top-left   # top-left|top-right|bottom-left|bottom-right|center
+        label_offset_x = 6
+        label_offset_y = 6
+        # visibility behavior
+        label_show = always         # always|hover|focus|hover+focus|current+focus|never
+        # colors (per state)
+        label_color_default = rgb(ffffff)
+        label_color_hover   = rgb(eeeeee)
+        label_color_focus   = rgb(ffcc66)
+        label_color_current = rgb(66ccff)
+        # scale multipliers for states
+        label_scale_hover = 1.0
+        label_scale_focus = 1.0
+        # label background bubble
+        label_bg_enable = 1
+        label_bg_color = rgba(00000088)
+        label_bg_shape = circle     # circle|square|rounded
+        label_bg_rounding = 8       # used for rounded
+        label_padding = 4
+        # font + precision
+        label_font_family = Sans
+        label_font_bold = 0
+        label_font_italic = 0
+        label_text_underline = 0
+        label_text_strikethrough = 0
+        label_pixel_snap = 1
+        # optional: override tokens (up to 50, comma-separated). Empty entries allowed.
+        # label_token_map = "1,2,3,4,5,6,7,8,9,0,!,@,#,$,%,^,&,*,(,),a,b,c,..."
+    }
+}
+```
+
 Here are a list of options you can use:  
 | option | description |
 | --- | --- |
@@ -196,8 +247,8 @@ Keyboard navigation dispatchers (when overview is active):
 - Reading order (row-major) for horizontal movement can be enabled with `keynav_reading_order`. At grid ends it will wrap to start/end only if both `keynav_wrap_h` and `keynav_wrap_v` are enabled.
 - `hyprexpo:kb_confirm`: selects the focused tile.
 - `hyprexpo:kb_selectn, <id>`: selects by workspace id (legacy; `0` → `10`).
-- `hyprexpo:kb_selecti, <index>`: selects by 1-based visual index (recommended for single-keystroke mapping).
-- `hyprexpo:kb_select, <token>`: selects by a single token (1..9, 0, a..z), mainly for symbol-based configs.
+- `hyprexpo:kb_selecti, <index>`: selects by 1‑based visual index (recommended for single‑keystroke mapping).
+- `hyprexpo:kb_select, <token>`: selects by a single token (1..9, 0, a..z), mainly for symbol‑based configs.
 
 Border styles:
 - `simple`: single-color border using `border_width`, `border_color_current`, `border_color_focus`.
