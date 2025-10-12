@@ -425,6 +425,11 @@ COverview::COverview(PHLWORKSPACE startedOn_, bool swipe_) : startedOn(startedOn
 
     lastMousePosLocal = g_pInputManager->getMouseCoordsInternal() - pMonitor->m_position;
 
+    // Initialize hoveredID based on current mouse position
+    int hx = std::clamp((int)(lastMousePosLocal.x / pMonitor->m_size.x * SIDE_LENGTH), 0, SIDE_LENGTH - 1);
+    int hy = std::clamp((int)(lastMousePosLocal.y / pMonitor->m_size.y * SIDE_LENGTH), 0, SIDE_LENGTH - 1);
+    hoveredID = hx + hy * SIDE_LENGTH;
+
     auto onCursorMove = [this](void* self, SCallbackInfo& info, std::any param) {
         if (closing)
             return;
