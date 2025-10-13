@@ -72,9 +72,9 @@ plugin {
         label_bg_color = rgba(00000088)
         label_bg_shape = circle     # circle|square|rounded
         label_bg_rounding = 8       # used for rounded
-        label_padding = 4
+        label_padding = 8           # default: 8px
         # font + precision
-        label_font_family = Sans
+        label_font_family = sans
         label_font_bold = 0
         label_font_italic = 0
         label_text_underline = 0
@@ -95,7 +95,7 @@ plugin {
 | `plugin:hyprexpo:columns` | int | how many desktops per row | `3` |
 | `plugin:hyprexpo:gaps_in` | int | inner spacing between tiles (px) | `5` |
 | `plugin:hyprexpo:gaps_out` | int | outer margin around grid (px), animated during open/close | `0` |
-| `plugin:hyprexpo:bg_col` | color | grid background color | `rgb(111111)` |
+| `plugin:hyprexpo:bg_col` | color | grid background color | `0xFF111111` |
 | `plugin:hyprexpo:workspace_method` | string | placement: `center current` or `first <ws>` | `center current` |
 | `plugin:hyprexpo:skip_empty` | bool (int) | skip empty workspaces using selector `m` (`1`) or show all with `r` (`0`) | `0` |
 | `plugin:hyprexpo:gesture_distance` | int | swipe distance considered "max" (px) | `200` |
@@ -110,7 +110,8 @@ plugin {
 | `plugin:hyprexpo:tile_rounding_current` | int | current tile radius (`-1` = inherit) | `-1` |
 | `plugin:hyprexpo:tile_rounding_hover` | int | hover tile radius (`-1` = inherit) | `-1` |
 | `plugin:hyprexpo:border_width` | int | border thickness (px) | `2` |
-| `plugin:hyprexpo:border_color_current` | string | current tile border - solid: `rgb(66ccff)` or `0xFF66CCFF`, gradient: `rgba(33ccffee) rgba(00ff99ee) 45deg` | `rgb(66ccff)` |
+| `plugin:hyprexpo:border_color` | string | default border for non-highlighted tiles - solid: `rgb(66ccff)` or `0xFF66CCFF`, gradient: `rgba(33ccffee) rgba(00ff99ee) 45deg` | `""` (empty) |
+| `plugin:hyprexpo:border_color_current` | string | current tile border - supports solid or gradient (see above) | `rgb(66ccff)` |
 | `plugin:hyprexpo:border_color_focus` | string | focused tile border - supports solid or gradient (see above) | `rgb(ffcc66)` |
 | `plugin:hyprexpo:border_color_hover` | string | hovered tile border - supports solid or gradient (see above) | `rgb(aabbcc)` |
 | `plugin:hyprexpo:border_grad_current` | string | **DEPRECATED** - use `border_color_current` with gradient format instead | empty |
@@ -136,7 +137,7 @@ plugin {
 | `plugin:hyprexpo:label_scale_hover` | float | scale multiplier on hover | `1.0` |
 | `plugin:hyprexpo:label_scale_focus` | float | scale multiplier on focus | `1.0` |
 | `plugin:hyprexpo:label_font_size` | int | base font size (px) | `16` |
-| `plugin:hyprexpo:label_font_family` | string | Pango font family | `Sans` |
+| `plugin:hyprexpo:label_font_family` | string | Pango font family | `sans` |
 | `plugin:hyprexpo:label_font_bold` | bool (int) | bold text | `0` |
 | `plugin:hyprexpo:label_font_italic` | bool (int) | italic text | `0` |
 | `plugin:hyprexpo:label_text_underline` | bool (int) | underline text | `0` |
@@ -268,20 +269,38 @@ Uses the same syntax as Hyprland's `gesture` keyword.
 
 ### Per-Monitor Workspace Method
 
-You can configure different workspace methods for different monitors using the `workspace_method` custom keyword:
+The `workspace_method` custom keyword supports two formats and can be used flexibly:
 
+**Format 1: Global Default (2 arguments)**
 ```ini
-# Global default (inside plugin block)
+workspace_method = <center|first> <workspace>
+```
+Can be used inside OR outside the plugin block. Sets the default for all monitors.
+
+**Format 2: Per-Monitor (3 arguments)**
+```ini
+workspace_method = MONITOR_NAME <center|first> <workspace>
+```
+Must be used outside the plugin block at top level. Overrides the global default for specific monitors.
+
+**Example Configuration:**
+```ini
+# Global default (can be inside plugin block OR at top level)
 plugin {
     hyprexpo {
         workspace_method = center current
     }
 }
 
-# Per-monitor overrides (outside plugin block, at top level)
+# Per-monitor overrides (at top level, repeatable)
 workspace_method = DP-1 first 1
-workspace_method = HDMI-A-1 center current
+workspace_method = HDMI-A-1 center 5
 workspace_method = eDP-1 first 10
 ```
 
-The global keyword format: `workspace_method = MONITOR_NAME <center|first> <workspace>`
+**Priority Order:**
+1. Monitor-specific config (3-arg format) - highest priority
+2. Global keyword config (2-arg format via `workspace_method` keyword)
+3. Plugin config value (`plugin:hyprexpo:workspace_method`) - fallback
+
+This allows complete flexibility: set a global default and override specific monitors as needed.
