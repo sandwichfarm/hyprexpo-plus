@@ -122,28 +122,44 @@ static Hyprlang::CParseResult workspaceMethodKeyword(const char* LHS, const char
     if (g_unloading)
         return result;
 
-    // Parse format: "MONITOR_NAME method workspace"
-    // Example: "workspace_method = DP-1 first 19"
+    // Parse format:
+    //   2 args (global default): "method workspace" -> e.g. "first 1" or "center current"
+    //   3 args (per-monitor): "MONITOR_NAME method workspace" -> e.g. "DP-1 first 19"
     CConstVarList data(RHS);
 
-    if (data.size() < 3) {
-        result.setError("workspace_method requires format: MONITOR_NAME <center|first> <workspace>");
+    if (data.size() == 2) {
+        // Global default format
+        const std::string methodType = std::string{data[0]};
+        const std::string workspace = std::string{data[1]};
+
+        if (methodType != "center" && methodType != "first") {
+            result.setError(std::format("Invalid method type '{}', expected 'center' or 'first'", methodType).c_str());
+            return result;
+        }
+
+        // Store with special key for global default
+        g_monitorWorkspaceMethods["__global__"] = methodType + " " + workspace;
+        return result;
+
+    } else if (data.size() == 3) {
+        // Per-monitor format
+        const std::string monitorName = std::string{data[0]};
+        const std::string methodType = std::string{data[1]};
+        const std::string workspace = std::string{data[2]};
+
+        if (methodType != "center" && methodType != "first") {
+            result.setError(std::format("Invalid method type '{}', expected 'center' or 'first'", methodType).c_str());
+            return result;
+        }
+
+        // Store in global map
+        g_monitorWorkspaceMethods[monitorName] = methodType + " " + workspace;
+        return result;
+
+    } else {
+        result.setError("workspace_method requires format: <center|first> <workspace> OR MONITOR_NAME <center|first> <workspace>");
         return result;
     }
-
-    const std::string monitorName = std::string{data[0]};
-    const std::string methodType = std::string{data[1]};
-    const std::string workspace = std::string{data[2]};
-
-    if (methodType != "center" && methodType != "first") {
-        result.setError(std::format("Invalid method type '{}', expected 'center' or 'first'", methodType).c_str());
-        return result;
-    }
-
-    // Store in global map
-    g_monitorWorkspaceMethods[monitorName] = methodType + " " + workspace;
-
-    return result;
 }
 
 static Hyprlang::CParseResult expoGestureKeyword(const char* LHS, const char* RHS) {
