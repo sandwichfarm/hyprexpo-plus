@@ -247,42 +247,77 @@ static void removeOverview(WP<Hyprutils::Animation::CBaseAnimatedVariable> thisp
 static std::pair<bool, int> getWorkspaceMethodForMonitor(PHLMONITOR monitor) {
     static auto const* PMETHOD = (Hyprlang::STRING const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:workspace_method")->getDataStaticPtr();
 
-    // Priority: hyprexpo_workspace_method keyword > plugin config value
-    // Both support 2 formats: "method workspace" (global) or "MONITOR method workspace" (per-monitor)
     const std::string monitorName = monitor->m_name;
-    std::string methodStr;
+    const std::string configStr = std::string{*PMETHOD};
 
-    // First check hyprexpo_workspace_method keyword for this monitor
-    auto it = g_monitorWorkspaceMethods.find(monitorName);
-    if (it != g_monitorWorkspaceMethods.end()) {
-        methodStr = it->second;
-    } else {
-        // Fallback to plugin config value
-        methodStr = std::string{*PMETHOD};
+    // Parse config string. Supports:
+    // 1. Global: "center current" or "first 1"
+    // 2. Per-monitor: "DP-1 first 1, HDMI-1 center current"
+    // 3. The parser looks for 3-token groups (monitor method workspace) vs 2-token (method workspace)
+
+    std::string methodStr;
+    bool foundMonitorConfig = false;
+
+    // Split by commas to get individual entries
+    std::vector<std::string> entries;
+    size_t start = 0;
+    while (start < configStr.size()) {
+        size_t commaPos = configStr.find(',', start);
+        if (commaPos == std::string::npos)
+            commaPos = configStr.size();
+
+        std::string entry = configStr.substr(start, commaPos - start);
+        // Trim whitespace
+        size_t firstNonSpace = entry.find_first_not_of(" \t");
+        size_t lastNonSpace = entry.find_last_not_of(" \t");
+        if (firstNonSpace != std::string::npos)
+            entry = entry.substr(firstNonSpace, lastNonSpace - firstNonSpace + 1);
+
+        if (!entry.empty())
+            entries.push_back(entry);
+
+        start = commaPos + 1;
     }
 
-    // Parse the method string - supports both 2-arg and 3-arg formats
+    // Try to find a monitor-specific config
+    std::string globalFallback;
+    for (const auto& entry : entries) {
+        CVarList tokens{entry, 0, 's', true};
+
+        if (tokens.size() == 3) {
+            // Format: "MONITOR method workspace"
+            std::string entryMonitor = std::string{tokens[0]};
+            if (entryMonitor == monitorName) {
+                // Found config for this monitor
+                methodStr = std::string{tokens[1]} + " " + std::string{tokens[2]};
+                foundMonitorConfig = true;
+                break;
+            }
+        } else if (tokens.size() == 2 && globalFallback.empty()) {
+            // Format: "method workspace" - save as global fallback
+            globalFallback = entry;
+        }
+    }
+
+    // If no monitor-specific config found, use global fallback or original string
+    if (!foundMonitorConfig) {
+        if (!globalFallback.empty())
+            methodStr = globalFallback;
+        else
+            methodStr = configStr;
+    }
+
+    // Parse the method string (format: "method workspace")
     bool methodCenter = true;
     int methodStartID = monitor->activeWorkspaceID();
 
     CVarList method{methodStr, 0, 's', true};
-    if (method.size() == 2) {
-        // Global format: "method workspace"
+    if (method.size() >= 2) {
         methodCenter = method[0] == "center";
         methodStartID = getWorkspaceIDNameFromString(method[1]).id;
         if (methodStartID == WORKSPACE_INVALID)
             methodStartID = monitor->activeWorkspaceID();
-    } else if (method.size() == 3) {
-        // Per-monitor format: "MONITOR method workspace"
-        // Check if it's for this monitor
-        if (std::string{method[0]} == monitorName) {
-            methodCenter = method[1] == "center";
-            methodStartID = getWorkspaceIDNameFromString(method[2]).id;
-            if (methodStartID == WORKSPACE_INVALID)
-                methodStartID = monitor->activeWorkspaceID();
-        }
-        // If not for this monitor, keep defaults (will show current workspace)
-    } else {
+    } else if (method.size() > 0) {
         Debug::log(ERR, "[hyprexpo] invalid workspace_method for monitor {}: {}", monitorName, methodStr);
     }
 

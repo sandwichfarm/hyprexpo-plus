@@ -15,6 +15,7 @@ plugin {
         gaps_in = 5
         bg_col = rgb(111111)
         workspace_method = center current # [center/first] [workspace] e.g. first 1 or center m+1
+                                          # Supports per-monitor: DP-1 first 1, HDMI-1 center current
 
         gesture_distance = 200 # how far is the "max" for the gesture
         gaps_out = 0 # outer margin (px)
@@ -96,7 +97,7 @@ plugin {
 | `plugin:hyprexpo:gaps_in` | int | inner spacing between tiles (px) | `5` |
 | `plugin:hyprexpo:gaps_out` | int | outer margin around grid (px), animated during open/close | `0` |
 | `plugin:hyprexpo:bg_col` | color | grid background color | `0xFF111111` |
-| `plugin:hyprexpo:workspace_method` | string | placement: `center current` or `first <ws>` | `center current` |
+| `plugin:hyprexpo:workspace_method` | string | placement: `center current` or `first <ws>`, supports per-monitor with delimiter (see below) | `center current` |
 | `plugin:hyprexpo:skip_empty` | bool (int) | skip empty workspaces using selector `m` (`1`) or show all with `r` (`0`) | `0` |
 | `plugin:hyprexpo:gesture_distance` | int | swipe distance considered "max" (px) | `200` |
 
@@ -269,64 +270,41 @@ Uses the same syntax as Hyprland's `gesture` keyword.
 
 ### Per-Monitor Workspace Method
 
-Both the plugin config and the global keyword support flexible workspace method configuration:
+The `workspace_method` config supports both global and per-monitor configurations:
 
-**Supported Formats:**
-- **2 arguments (global default)**: `<center|first> <workspace>`
-- **3 arguments (per-monitor)**: `MONITOR_NAME <center|first> <workspace>`
-
-**Configuration Options:**
-
-1. **Plugin Config** (`plugin:hyprexpo:workspace_method`)
-   - Can be used inside the plugin block
-   - Supports both 2-arg and 3-arg formats
-   - Good for single-monitor setups or when you want everything in the plugin block
-
-2. **Global Keyword** (`hyprexpo_workspace_method`)
-   - Used outside the plugin block at top level
-   - Supports both 2-arg and 3-arg formats
-   - Repeatable for multiple monitors
-   - Takes priority over plugin config
+**Format:**
+- **Global**: `<center|first> <workspace>`
+- **Per-monitor**: `MONITOR <center|first> <workspace>, MONITOR2 <center|first> <workspace>, ...`
 
 **Example Configurations:**
 
 ```ini
-# Option 1: Everything in plugin block
+# Option 1: Global default (single monitor or all monitors use same config)
 plugin {
     hyprexpo {
-        workspace_method = DP-1 first 1    # Works with both formats!
-        # or
-        workspace_method = center current  # Global default
+        workspace_method = center current
     }
 }
 
-# Option 2: Global keyword for per-monitor (recommended for multi-monitor)
+# Option 2: Per-monitor configuration with comma delimiter
 plugin {
     hyprexpo {
-        workspace_method = center current  # Global default
+        workspace_method = DP-1 first 1, HDMI-A-1 center 5, eDP-1 first 10
     }
 }
 
-# Per-monitor overrides (at top level, repeatable)
-hyprexpo_workspace_method = DP-1 first 1
-hyprexpo_workspace_method = HDMI-A-1 center 5
-hyprexpo_workspace_method = eDP-1 first 10
-
-# Option 3: Mix and match - use whatever works for your preference
+# Option 3: Mix global and per-monitor (monitors without specific config use global)
 plugin {
     hyprexpo {
-        workspace_method = first 1         # Global default in plugin
+        # DP-1 uses "first 1", all other monitors use "center current"
+        workspace_method = DP-1 first 1, center current
     }
 }
-hyprexpo_workspace_method = DP-1 center 5  # Override DP-1 with global keyword
 ```
 
-**Priority Order:**
-1. `hyprexpo_workspace_method` keyword for specific monitor (highest priority)
-2. `plugin:hyprexpo:workspace_method` config value (fallback)
-
 **Notes:**
-- Both 2-arg and 3-arg formats work in both locations
-- Use whichever style fits your preference and workflow
-- The 3-arg format in plugin config will only apply to the specified monitor
-- The 2-arg format applies to all monitors without specific overrides
+- Use comma `,` to separate multiple configurations
+- Format for per-monitor: `MONITOR method workspace` (3 tokens)
+- Format for global: `method workspace` (2 tokens)
+- If a 2-token entry is found, it's used as the global default for all monitors without a specific config
+- The parser automatically detects whether an entry is per-monitor (3 tokens) or global (2 tokens)

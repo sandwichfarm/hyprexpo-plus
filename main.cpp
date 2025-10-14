@@ -116,52 +116,6 @@ static void failNotif(const std::string& reason) {
     HyprlandAPI::addNotification(PHANDLE, "[hyprexpo] Failure in initialization: " + reason, CHyprColor{1.0, 0.2, 0.2, 1.0}, 5000);
 }
 
-static Hyprlang::CParseResult workspaceMethodKeyword(const char* LHS, const char* RHS) {
-    Hyprlang::CParseResult result;
-
-    if (g_unloading)
-        return result;
-
-    // Parse format - accepts both:
-    //   2 args: "method workspace" (global default)
-    //   3 args: "MONITOR_NAME method workspace" (per-monitor)
-    CConstVarList data(RHS);
-
-    if (data.size() == 2) {
-        // Global format - not really needed since plugin config does this, but accept it
-        const std::string methodType = std::string{data[0]};
-        const std::string workspace = std::string{data[1]};
-
-        if (methodType != "center" && methodType != "first") {
-            result.setError(std::format("Invalid method type '{}', expected 'center' or 'first'", methodType).c_str());
-            return result;
-        }
-
-        // Don't store - let plugin config handle global default
-        // Just return success so it doesn't error
-        return result;
-
-    } else if (data.size() == 3) {
-        // Per-monitor format
-        const std::string monitorName = std::string{data[0]};
-        const std::string methodType = std::string{data[1]};
-        const std::string workspace = std::string{data[2]};
-
-        if (methodType != "center" && methodType != "first") {
-            result.setError(std::format("Invalid method type '{}', expected 'center' or 'first'", methodType).c_str());
-            return result;
-        }
-
-        // Store in global map
-        g_monitorWorkspaceMethods[monitorName] = methodType + " " + workspace;
-        return result;
-
-    } else {
-        result.setError("hyprexpo_workspace_method requires format: <center|first> <workspace> OR MONITOR_NAME <center|first> <workspace>");
-        return result;
-    }
-}
-
 static Hyprlang::CParseResult expoGestureKeyword(const char* LHS, const char* RHS) {
     Hyprlang::CParseResult    result;
 
@@ -294,11 +248,14 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
     HyprlandAPI::addDispatcherV2(PHANDLE, "hyprexpo:kb_selecti", ::onKbSelectIndexDispatcher);
 
     HyprlandAPI::addConfigKeyword(PHANDLE, "hyprexpo_gesture", ::expoGestureKeyword, {});
-    HyprlandAPI::addConfigKeyword(PHANDLE, "hyprexpo_workspace_method", ::workspaceMethodKeyword, {});
 
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:columns", Hyprlang::INT{3});
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:gaps_in", Hyprlang::INT{5});
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:bg_col", Hyprlang::INT{0xFF111111});
+    // Supports both global and per-monitor formats:
+    // Global: "center current" or "first 1"
+    // Per-monitor: "DP-1 first 1, HDMI-1 center current"
+    // Mix: "DP-1 first 1, center current" (DP-1 uses first 1, others use center current)
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:workspace_method", Hyprlang::STRING{"center current"});
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:skip_empty", Hyprlang::INT{0});
 
@@ -369,7 +326,9 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
     // default off: spatial moves by default
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:keynav_reading_order", Hyprlang::INT{0});
 
-    HyprlandAPI::reloadConfig();
+    // Note: We don't call HyprlandAPI::reloadConfig() to avoid startup errors.
+    // Config values are registered and will be available immediately for plugin use.
+    // If you add/modify plugin config values, reload with: hyprctl reload
 
     return {"hyprexpo", "A plugin for an overview", "Vaxry", "1.0"};
 }
