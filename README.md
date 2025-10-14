@@ -256,6 +256,36 @@ submap = hyprexpo
 submap = reset
 ```
 
+#### Avoiding Startup Dispatcher Errors
+
+Due to a Hyprland architecture limitation ([Issue #5247](https://github.com/hyprwm/Hyprland/issues/5247), [Discussion #4373](https://github.com/hyprwm/Hyprland/discussions/4373)), keybindings are parsed before plugins load, causing temporary "Invalid dispatcher" errors on startup. This affects **all plugins with custom dispatchers**.
+
+**Recommended workaround:** Move plugin keybinds to a separate file and source it after plugins load:
+
+```ini
+# ~/.config/hypr/hyprland.conf
+# Source plugin binds after startup to avoid dispatcher errors
+source = ~/.config/hypr/hyprexpo-binds.conf
+```
+
+```ini
+# ~/.config/hypr/hyprexpo-binds.conf
+# Toggle overview
+bind = SUPER, g, hyprexpo:expo, toggle
+
+# Keyboard navigation submap (optional)
+submap = hyprexpo
+    bind = , left,  hyprexpo:kb_focus, left
+    bind = , right, hyprexpo:kb_focus, right
+    bind = , up,    hyprexpo:kb_focus, up
+    bind = , down,  hyprexpo:kb_focus, down
+    bind = , return, hyprexpo:kb_confirm
+    # ... rest of your binds
+submap = reset
+```
+
+**Note:** The dispatcher errors are cosmetic and don't affect functionality. If you prefer to keep all binds in one file, the errors will flash briefly on startup but everything will work normally once the plugin loads.
+
 ### Gestures
 
 Custom gesture keyword for HyprExpo-specific gestures:
