@@ -8,6 +8,7 @@
 #include <hyprland/src/managers/animation/AnimationManager.hpp>
 #include <hyprland/src/managers/animation/DesktopAnimationManager.hpp>
 #include <hyprland/src/managers/input/InputManager.hpp>
+#include <hyprland/src/managers/PointerManager.hpp>
 #include <hyprland/src/helpers/time/Time.hpp>
 #undef private
 #include "OverviewPassElement.hpp"
@@ -330,7 +331,7 @@ static std::pair<bool, int> getWorkspaceMethodForMonitor(PHLMONITOR monitor) {
         if (methodStartID == WORKSPACE_INVALID)
             methodStartID = monitor->activeWorkspaceID();
     } else if (method.size() > 0) {
-        Debug::log(ERR, "[hyprexpo] invalid workspace_method for monitor {}: {}", monitorName, methodStr);
+        Log::logger->log(Log::ERR, "[hyprexpo] invalid workspace_method for monitor {}: {}", monitorName, methodStr);
     }
 
     return {methodCenter, methodStartID};
@@ -339,13 +340,13 @@ static std::pair<bool, int> getWorkspaceMethodForMonitor(PHLMONITOR monitor) {
 COverview::~COverview() {
     g_pHyprRenderer->makeEGLCurrent();
     images.clear(); // otherwise we get a vram leak
-    g_pInputManager->unsetCursorImage();
+    g_pPointerManager->resetCursorImage();
     g_pHyprOpenGL->markBlurDirtyForMonitor(pMonitor.lock());
     resetSubmapIfNeeded();
 }
 
 COverview::COverview(PHLWORKSPACE startedOn_, bool swipe_) : startedOn(startedOn_), swipe(swipe_) {
-    const auto PMONITOR = g_pCompositor->m_lastMonitor.lock();
+    const auto PMONITOR = g_pCompositor->getMonitorFromCursor();
     pMonitor            = PMONITOR;
 
     static auto* const* PCOLUMNS = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:columns")->getDataStaticPtr();
@@ -513,7 +514,7 @@ COverview::COverview(PHLWORKSPACE startedOn_, bool swipe_) : startedOn(startedOn
 
     openedID = currentid;
 
-    g_pInputManager->setCursorImageUntilUnset("left_ptr");
+    g_pPointerManager->resetCursorImage();
 
     lastMousePosLocal = g_pInputManager->getMouseCoordsInternal() - pMonitor->m_position;
 
