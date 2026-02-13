@@ -9,6 +9,9 @@
 #include <hyprland/src/managers/animation/DesktopAnimationManager.hpp>
 #include <hyprland/src/managers/input/InputManager.hpp>
 #include <hyprland/src/helpers/time/Time.hpp>
+#include <hyprland/src/desktop/state/FocusState.hpp>
+#include <hyprland/src/managers/cursor/CursorShapeOverrideController.hpp>
+#include <hyprland/src/managers/eventLoop/EventLoopManager.hpp>
 #undef private
 #include "OverviewPassElement.hpp"
 #include <hyprland/src/render/OpenGL.hpp>
@@ -238,10 +241,6 @@ static void damageMonitor(WP<Hyprutils::Animation::CBaseAnimatedVariable> thispt
     g_pOverview->damage();
 }
 
-static void removeOverview(WP<Hyprutils::Animation::CBaseAnimatedVariable> thisptr) {
-    g_pOverview.reset();
-}
-
 // Get workspace method configuration for a specific monitor
 // Returns pair of {isCenter, startWorkspaceID}
 static std::pair<bool, int> getWorkspaceMethodForMonitor(PHLMONITOR monitor) {
@@ -330,7 +329,7 @@ static std::pair<bool, int> getWorkspaceMethodForMonitor(PHLMONITOR monitor) {
         if (methodStartID == WORKSPACE_INVALID)
             methodStartID = monitor->activeWorkspaceID();
     } else if (method.size() > 0) {
-        Debug::log(ERR, "[hyprexpo] invalid workspace_method for monitor {}: {}", monitorName, methodStr);
+        Log::logger->log(Log::ERR, "[hyprexpo] invalid workspace_method for monitor {}: {}", monitorName, methodStr);
     }
 
     return {methodCenter, methodStartID};
@@ -339,13 +338,13 @@ static std::pair<bool, int> getWorkspaceMethodForMonitor(PHLMONITOR monitor) {
 COverview::~COverview() {
     g_pHyprRenderer->makeEGLCurrent();
     images.clear(); // otherwise we get a vram leak
-    g_pInputManager->unsetCursorImage();
+    Cursor::overrideController->unsetOverride(Cursor::CURSOR_OVERRIDE_UNKNOWN);
     g_pHyprOpenGL->markBlurDirtyForMonitor(pMonitor.lock());
     resetSubmapIfNeeded();
 }
 
 COverview::COverview(PHLWORKSPACE startedOn_, bool swipe_) : startedOn(startedOn_), swipe(swipe_) {
-    const auto PMONITOR = g_pCompositor->m_lastMonitor.lock();
+    const auto PMONITOR = Desktop::focusState()->monitor();
     pMonitor            = PMONITOR;
 
     static auto* const* PCOLUMNS = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:columns")->getDataStaticPtr();
@@ -513,7 +512,7 @@ COverview::COverview(PHLWORKSPACE startedOn_, bool swipe_) : startedOn(startedOn
 
     openedID = currentid;
 
-    g_pInputManager->setCursorImageUntilUnset("left_ptr");
+    Cursor::overrideController->setOverride("left_ptr", Cursor::CURSOR_OVERRIDE_UNKNOWN);
 
     lastMousePosLocal = g_pInputManager->getMouseCoordsInternal() - pMonitor->m_position;
 
@@ -740,6 +739,9 @@ void COverview::onKbSelectToken(int visibleIdx) {
 }
 
 void COverview::redrawID(int id, bool forcelowres) {
+    if (!pMonitor)
+        return;
+
     if (pMonitor->m_activeWorkspace != startedOn && !closing) {
         // likely user changed.
         onWorkspaceChange();
@@ -811,6 +813,9 @@ void COverview::redrawID(int id, bool forcelowres) {
 }
 
 void COverview::redrawAll(bool forcelowres) {
+    if (!pMonitor)
+        return;
+
     for (size_t i = 0; i < (size_t)(SIDE_LENGTH * SIDE_LENGTH); ++i) {
         redrawID(i, forcelowres);
     }
@@ -857,10 +862,11 @@ void COverview::close() {
 
     Vector2D    tileSize = (pMonitor->m_size / SIDE_LENGTH);
 
+    size->warp();
+    pos->warp();
+
     *size = pMonitor->m_size * pMonitor->m_size / tileSize;
     *pos  = (-((pMonitor->m_size / (double)SIDE_LENGTH) * Vector2D{ID % SIDE_LENGTH, ID / SIDE_LENGTH}) * pMonitor->m_scale) * (pMonitor->m_size / tileSize);
-
-    size->setCallbackOnEnd(removeOverview);
 
     closing = true;
 
@@ -888,6 +894,8 @@ void COverview::close() {
 
         startedOn = pMonitor->m_activeWorkspace;
     }
+
+    size->setCallbackOnEnd([](auto) { g_pEventLoopManager->doLater([] { g_pOverview.reset(); }); });
 }
 
 void COverview::onPreRender() {
@@ -912,7 +920,8 @@ void COverview::onWorkspaceChange() {
     }
 
     closeOnID = openedID;
-    close();
+    if (!closing)
+        close();
 }
 
 void COverview::render() {
@@ -1276,15 +1285,8 @@ void COverview::setClosing(bool closing_) {
     closing = closing_;
 }
 
-void COverview::resetSwipe() {
-    swipeWasCommenced = false;
-}
-
 void COverview::onSwipeUpdate(double delta) {
     m_isSwiping = true;
-
-    if (swipeWasCommenced)
-        return;
 
     static auto* const* PDISTANCE = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:gesture_distance")->getDataStaticPtr();
 
@@ -1305,6 +1307,9 @@ void COverview::onSwipeUpdate(double delta) {
 }
 
 void COverview::onSwipeEnd() {
+    if (closing || !m_isSwiping)
+        return;
+
     const auto SIZEMIN = pMonitor->m_size;
     const auto SIZEMAX = pMonitor->m_size * pMonitor->m_size / (pMonitor->m_size / SIDE_LENGTH);
     const auto PERC    = (size->value() - SIZEMIN).x / (SIZEMAX - SIZEMIN).x;
@@ -1317,7 +1322,7 @@ void COverview::onSwipeEnd() {
 
     size->setCallbackOnEnd([this](WP<Hyprutils::Animation::CBaseAnimatedVariable> thisptr) { redrawAll(true); });
 
-    swipeWasCommenced = true;
+    swipeWasCommenced = false;
     m_isSwiping       = false;
 }
 
