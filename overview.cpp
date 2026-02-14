@@ -8,6 +8,7 @@
 #include <hyprland/src/managers/animation/AnimationManager.hpp>
 #include <hyprland/src/managers/animation/DesktopAnimationManager.hpp>
 #include <hyprland/src/managers/input/InputManager.hpp>
+#include <hyprland/src/managers/PointerManager.hpp>
 #include <hyprland/src/helpers/time/Time.hpp>
 #undef private
 #include "OverviewPassElement.hpp"
@@ -15,6 +16,11 @@
 #include <hyprland/src/config/ConfigDataValues.hpp>
 #include <pango/pangocairo.h>
 #include <cmath>
+
+static bool isTransformRotated(wl_output_transform t) {
+    return t == WL_OUTPUT_TRANSFORM_90 || t == WL_OUTPUT_TRANSFORM_270 ||
+           t == WL_OUTPUT_TRANSFORM_FLIPPED_90 || t == WL_OUTPUT_TRANSFORM_FLIPPED_270;
+}
 
 struct SHyprGradientSpec {
     CHyprColor c1;
@@ -330,7 +336,7 @@ static std::pair<bool, int> getWorkspaceMethodForMonitor(PHLMONITOR monitor) {
         if (methodStartID == WORKSPACE_INVALID)
             methodStartID = monitor->activeWorkspaceID();
     } else if (method.size() > 0) {
-        Debug::log(ERR, "[hyprexpo] invalid workspace_method for monitor {}: {}", monitorName, methodStr);
+        Log::logger->log(Log::ERR, "[hyprexpo] invalid workspace_method for monitor {}: {}", monitorName, methodStr);
     }
 
     return {methodCenter, methodStartID};
@@ -339,13 +345,13 @@ static std::pair<bool, int> getWorkspaceMethodForMonitor(PHLMONITOR monitor) {
 COverview::~COverview() {
     g_pHyprRenderer->makeEGLCurrent();
     images.clear(); // otherwise we get a vram leak
-    g_pInputManager->unsetCursorImage();
+    g_pPointerManager->resetCursorImage();
     g_pHyprOpenGL->markBlurDirtyForMonitor(pMonitor.lock());
     resetSubmapIfNeeded();
 }
 
 COverview::COverview(PHLWORKSPACE startedOn_, bool swipe_) : startedOn(startedOn_), swipe(swipe_) {
-    const auto PMONITOR = g_pCompositor->m_lastMonitor.lock();
+    const auto PMONITOR = g_pCompositor->getMonitorFromCursor();
     pMonitor            = PMONITOR;
 
     static auto* const* PCOLUMNS = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:columns")->getDataStaticPtr();
@@ -438,6 +444,26 @@ COverview::COverview(PHLWORKSPACE startedOn_, bool swipe_) : startedOn(startedOn
 
     int          currentid = 0;
 
+    // Temporarily disable monitor rotation during framebuffer capture so
+    // workspace content renders in the logical (portrait) orientation
+    // rather than the physical panel orientation.
+    const auto savedTransform       = pMonitor->m_transform;
+    const auto savedTransformedSize = pMonitor->m_transformedSize;
+    const auto savedPixelSize       = pMonitor->m_pixelSize;
+
+    // Fix for rotated monitors: m_pixelSize contains physical panel dimensions
+    // (landscape), but we need logical portrait dimensions for the framebuffer
+    if (isTransformRotated(savedTransform)) {
+        // Swap monbox dimensions to match logical orientation
+        monbox = {{0, 0}, {monbox.h, monbox.w}};
+
+        // Override monitor state: disable rotation and set all size fields to
+        // portrait dimensions so beginRender sets up the viewport correctly
+        pMonitor->m_transform       = WL_OUTPUT_TRANSFORM_NORMAL;
+        pMonitor->m_pixelSize       = {monbox.w, monbox.h};
+        pMonitor->m_transformedSize = {monbox.w, monbox.h};
+    }
+
     PHLWORKSPACE openSpecial = PMONITOR->m_activeSpecialWorkspace;
     if (openSpecial)
         PMONITOR->m_activeSpecialWorkspace.reset();
@@ -451,7 +477,7 @@ COverview::COverview(PHLWORKSPACE startedOn_, bool swipe_) : startedOn(startedOn
         image.fb.alloc(monbox.w, monbox.h, PMONITOR->m_output->state->state().drmFormat);
 
         CRegion fakeDamage{0, 0, INT16_MAX, INT16_MAX};
-        g_pHyprRenderer->beginRender(PMONITOR, fakeDamage, RENDER_MODE_FULL_FAKE, nullptr, &image.fb);
+        g_pHyprRenderer->beginRender(PMONITOR, fakeDamage, RENDER_MODE_FULL_FAKE, nullptr, &image.fb, true);
 
         g_pHyprOpenGL->clear(CHyprColor{0, 0, 0, 1.0});
 
@@ -488,6 +514,11 @@ COverview::COverview(PHLWORKSPACE startedOn_, bool swipe_) : startedOn(startedOn
 
     g_pHyprRenderer->m_bBlockSurfaceFeedback = false;
 
+    // Restore the original monitor state after capture
+    pMonitor->m_transform       = savedTransform;
+    pMonitor->m_pixelSize       = savedPixelSize;
+    pMonitor->m_transformedSize = savedTransformedSize;
+
     PMONITOR->m_activeSpecialWorkspace = openSpecial;
     PMONITOR->m_activeWorkspace        = startedOn;
     startedOn->m_visible               = true;
@@ -513,7 +544,7 @@ COverview::COverview(PHLWORKSPACE startedOn_, bool swipe_) : startedOn(startedOn
 
     openedID = currentid;
 
-    g_pInputManager->setCursorImageUntilUnset("left_ptr");
+    g_pPointerManager->resetCursorImage();
 
     lastMousePosLocal = g_pInputManager->getMouseCoordsInternal() - pMonitor->m_position;
 
@@ -761,6 +792,20 @@ void COverview::redrawID(int id, bool forcelowres) {
     if (!ENABLE_LOWRES)
         monbox = {{0, 0}, pMonitor->m_pixelSize};
 
+    const auto savedTransform       = pMonitor->m_transform;
+    const auto savedTransformedSize = pMonitor->m_transformedSize;
+    const auto savedPixelSize       = pMonitor->m_pixelSize;
+
+    // Fix for rotated monitors: swap dimensions to match logical orientation
+    if (isTransformRotated(savedTransform)) {
+        monbox = {{0, 0}, {monbox.h, monbox.w}};
+
+        // Override monitor state to disable rotation
+        pMonitor->m_transform       = WL_OUTPUT_TRANSFORM_NORMAL;
+        pMonitor->m_pixelSize       = {monbox.w, monbox.h};
+        pMonitor->m_transformedSize = {monbox.w, monbox.h};
+    }
+
     auto& image = images[id];
 
     if (image.fb.m_size != monbox.size()) {
@@ -769,7 +814,7 @@ void COverview::redrawID(int id, bool forcelowres) {
     }
 
     CRegion fakeDamage{0, 0, INT16_MAX, INT16_MAX};
-    g_pHyprRenderer->beginRender(pMonitor.lock(), fakeDamage, RENDER_MODE_FULL_FAKE, nullptr, &image.fb);
+    g_pHyprRenderer->beginRender(pMonitor.lock(), fakeDamage, RENDER_MODE_FULL_FAKE, nullptr, &image.fb, true);
 
     g_pHyprOpenGL->clear(CHyprColor{0, 0, 0, 1.0});
 
@@ -801,6 +846,11 @@ void COverview::redrawID(int id, bool forcelowres) {
 
     g_pHyprOpenGL->m_renderData.blockScreenShader = true;
     g_pHyprRenderer->endRender();
+
+    // Restore the original monitor state after capture
+    pMonitor->m_transform       = savedTransform;
+    pMonitor->m_pixelSize       = savedPixelSize;
+    pMonitor->m_transformedSize = savedTransformedSize;
 
     pMonitor->m_activeSpecialWorkspace = openSpecial;
     pMonitor->m_activeWorkspace        = startedOn;

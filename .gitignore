@@ -40,3 +40,8 @@ result-man
 
 #no helper scripts
 *.sh
+
+# Test files
+test_*.cpp
+test_version
+test_hash

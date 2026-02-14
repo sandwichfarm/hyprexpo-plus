@@ -3,7 +3,7 @@
 #include <unistd.h>
 
 #include <hyprland/src/Compositor.hpp>
-#include <hyprland/src/desktop/Window.hpp>
+#include <hyprland/src/desktop/view/Window.hpp>
 #include <hyprland/src/config/ConfigManager.hpp>
 #include <hyprland/src/desktop/DesktopTypes.hpp>
 #include <hyprland/src/render/Renderer.hpp>
@@ -91,7 +91,7 @@ static SDispatchResult onExpoDispatcher(std::string arg) {
             g_pOverview->close();
         else {
             renderingOverview = true;
-            g_pOverview       = std::make_unique<COverview>(g_pCompositor->m_lastMonitor->m_activeWorkspace);
+            g_pOverview       = std::make_unique<COverview>(g_pCompositor->getMonitorFromCursor()->m_activeWorkspace);
             renderingOverview = false;
         }
         return {};
@@ -107,7 +107,7 @@ static SDispatchResult onExpoDispatcher(std::string arg) {
         return {};
 
     renderingOverview = true;
-    g_pOverview       = std::make_unique<COverview>(g_pCompositor->m_lastMonitor->m_activeWorkspace);
+    g_pOverview       = std::make_unique<COverview>(g_pCompositor->getMonitorFromCursor()->m_activeWorkspace);
     renderingOverview = false;
     return {};
 }
@@ -240,7 +240,7 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
 
     const std::string HASH = __hyprland_api_get_hash();
 
-    if (HASH != GIT_COMMIT_HASH) {
+    if (HASH != __hyprland_api_get_client_hash()) {
         failNotif("Version mismatch (headers ver is not equal to running hyprland ver)");
         throw std::runtime_error("[he] Version mismatch");
     }
@@ -376,7 +376,7 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
 
     HyprlandAPI::reloadConfig();
 
-    return {"hyprexpo", "A plugin for an overview", "Vaxry", "1.0"};
+    return {"hyprexpo-plus", "hyprexpo+ with keyboard selection, labels, and borders", "sandwich", "1.0"};
 }
 
 APICALL EXPORT void PLUGIN_EXIT() {
