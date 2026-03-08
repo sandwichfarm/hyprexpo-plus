@@ -1,0 +1,45 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+
+    steps:
+      - name: Install dependencies
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm \
+            base-devel \
+            git \
+            hyprland \
+            hyprland-headers \
+            pango \
+            cairo \
+            libdrm \
+            libinput \
+            pixman \
+            wayland \
+            libxkbcommon \
+            pkg-config
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build plugin
+        run: make all
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: hyprexpo.so
+          generate_release_notes: true
