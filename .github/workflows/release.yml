@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - 'v*'
+    branches:
+      - 'ci/**'
 
 permissions:
   contents: write
@@ -15,6 +17,11 @@ jobs:
       image: archlinux:latest
 
     steps:
+      - name: Initialize pacman keyring
+        run: |
+          pacman-key --init
+          pacman-key --populate archlinux
+
       - name: Install dependencies
         run: |
           pacman -Syu --noconfirm
@@ -22,7 +29,6 @@ jobs:
             base-devel \
             git \
             hyprland \
-            hyprland-headers \
             pango \
             cairo \
             libdrm \
@@ -30,7 +36,7 @@ jobs:
             pixman \
             wayland \
             libxkbcommon \
-            pkg-config
+            pkgconf
 
       - name: Checkout
         uses: actions/checkout@v4
@@ -39,6 +45,7 @@ jobs:
         run: make all
 
       - name: Create release
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           files: hyprexpo.so
