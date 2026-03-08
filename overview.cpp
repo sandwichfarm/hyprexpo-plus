@@ -1,5 +1,6 @@
 #include "overview.hpp"
 #include <any>
+#include <hyprland/src/event/EventBus.hpp>
 #define private public
 #include <hyprland/src/render/Renderer.hpp>
 #include <hyprland/src/Compositor.hpp>
@@ -553,7 +554,7 @@ COverview::COverview(PHLWORKSPACE startedOn_, bool swipe_) : startedOn(startedOn
     int hy = std::clamp((int)(lastMousePosLocal.y / pMonitor->m_size.y * SIDE_LENGTH), 0, SIDE_LENGTH - 1);
     hoveredID = hx + hy * SIDE_LENGTH;
 
-    auto onCursorMove = [this](void* self, SCallbackInfo& info, std::any param) {
+    mouseMoveHook = Event::bus()->m_events.input.mouse.move.listen([this](const Vector2D& coords, Event::SCallbackInfo& info) {
         if (closing)
             return;
 
@@ -569,9 +570,26 @@ COverview::COverview(PHLWORKSPACE startedOn_, bool swipe_) : startedOn(startedOn
             hoveredID = newHoveredID;
             damage();
         }
-    };
+    });
 
-    auto onCursorSelect = [this](void* self, SCallbackInfo& info, std::any param) {
+    touchMoveHook = Event::bus()->m_events.input.touch.motion.listen([this](const ITouch::SMotionEvent& e, Event::SCallbackInfo& info) {
+        if (closing)
+            return;
+
+        info.cancelled    = true;
+        lastMousePosLocal = g_pInputManager->getMouseCoordsInternal() - pMonitor->m_position;
+
+        int hx = std::clamp((int)(lastMousePosLocal.x / pMonitor->m_size.x * SIDE_LENGTH), 0, SIDE_LENGTH - 1);
+        int hy = std::clamp((int)(lastMousePosLocal.y / pMonitor->m_size.y * SIDE_LENGTH), 0, SIDE_LENGTH - 1);
+        int newHoveredID = hx + hy * SIDE_LENGTH;
+
+        if (newHoveredID != hoveredID) {
+            hoveredID = newHoveredID;
+            damage();
+        }
+    });
+
+    mouseButtonHook = Event::bus()->m_events.input.mouse.button.listen([this](const IPointer::SButtonEvent& e, Event::SCallbackInfo& info) {
         if (closing)
             return;
 
@@ -580,13 +598,18 @@ COverview::COverview(PHLWORKSPACE startedOn_, bool swipe_) : startedOn(startedOn
         selectHoveredWorkspace();
 
         close();
-    };
+    });
 
-    mouseMoveHook = g_pHookSystem->hookDynamic("mouseMove", onCursorMove);
-    touchMoveHook = g_pHookSystem->hookDynamic("touchMove", onCursorMove);
+    touchDownHook = Event::bus()->m_events.input.touch.down.listen([this](const ITouch::SDownEvent& e, Event::SCallbackInfo& info) {
+        if (closing)
+            return;
 
-    mouseButtonHook = g_pHookSystem->hookDynamic("mouseButton", onCursorSelect);
-    touchDownHook   = g_pHookSystem->hookDynamic("touchDown", onCursorSelect);
+        info.cancelled = true;
+
+        selectHoveredWorkspace();
+
+        close();
+    });
 
     enterSubmapIfEnabled();
 }

@@ -7,7 +7,7 @@
 #include <hyprland/src/render/Framebuffer.hpp>
 #include <hyprland/src/render/Texture.hpp>
 #include <hyprland/src/helpers/AnimatedVariable.hpp>
-#include <hyprland/src/managers/HookSystemManager.hpp>
+#include <hyprland/src/helpers/signal/Signal.hpp>
 #include <vector>
 
 // saves on resources, but is a bit broken rn with blur.
@@ -100,10 +100,10 @@ class COverview {
 
     bool                         closing = false;
 
-    SP<HOOK_CALLBACK_FN>         mouseMoveHook;
-    SP<HOOK_CALLBACK_FN>         mouseButtonHook;
-    SP<HOOK_CALLBACK_FN>         touchMoveHook;
-    SP<HOOK_CALLBACK_FN>         touchDownHook;
+    CHyprSignalListener          mouseMoveHook;
+    CHyprSignalListener          mouseButtonHook;
+    CHyprSignalListener          touchMoveHook;
+    CHyprSignalListener          touchDownHook;
 
     bool                         swipe             = false;
     bool                         swipeWasCommenced = false;
