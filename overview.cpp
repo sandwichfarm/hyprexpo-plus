@@ -347,6 +347,7 @@ COverview::~COverview() {
     g_pHyprRenderer->makeEGLCurrent();
     images.clear(); // otherwise we get a vram leak
     g_pPointerManager->resetCursorImage();
+    g_pInputManager->simulateMouseMovement();
     g_pHyprOpenGL->markBlurDirtyForMonitor(pMonitor.lock());
     resetSubmapIfNeeded();
 }
