@@ -16,7 +16,8 @@
 #include <hyprland/src/config/shared/actions/ConfigActions.hpp>
 #include <hyprland/src/config/shared/animation/AnimationTree.hpp>
 #include <hyprland/src/desktop/state/FocusState.hpp>
-#include <hyprland/src/desktop/view/Window.hpp>
+#include <hyprland/src/desktop/view/window/Window.hpp>
+#include <hyprland/src/desktop/view/window/WindowPresentation.hpp>
 #include <hyprland/src/layout/LayoutManager.hpp>
 #include <hyprland/src/layout/space/Space.hpp>
 #include <hyprland/src/animation/AnimationManager.hpp>
@@ -467,11 +468,11 @@ void normalizeMonitorWorkspaceRenderState(PHLMONITOR monitor) {
     }
 
     for (const auto& window : Desktop::windowState()->windows()) {
-        if (!window || !window->m_isMapped || window->isHidden() || window->m_pinned || !window->m_workspace || window->m_workspace->m_monitor != monitor)
+        if (!window || !window->mapped() || window->isHidden() || (window->m_state & Desktop::View::WINDOW_STATE_PINNED) || !window->m_workspace || window->m_workspace->m_monitor != monitor)
             continue;
 
-        window->alpha(Desktop::View::WINDOW_ALPHA_MOVE_FROM_WORKSPACE)->setValueAndWarp(1.F);
-        *window->alpha(Desktop::View::WINDOW_ALPHA_MOVE_FROM_WORKSPACE) = 1.F;
+        window->presentation().alpha(Desktop::View::WINDOW_ALPHA_MOVE_FROM_WORKSPACE)->setValueAndWarp(1.F);
+        *window->presentation().alpha(Desktop::View::WINDOW_ALPHA_MOVE_FROM_WORKSPACE) = 1.F;
     }
 }
 
@@ -486,16 +487,16 @@ std::vector<SPinnedWindowPreviewState> applyPinnedWindowPreviewState(bool showPi
         return states;
 
     for (const auto& window : Desktop::windowState()->windows()) {
-        if (!window || !window->m_isMapped || !window->m_pinned)
+        if (!window || !window->mapped() || !(window->m_state & Desktop::View::WINDOW_STATE_PINNED))
             continue;
 
         states.push_back({
-            .window = window,
+            .window    = window,
             .workspace = window->m_workspace,
-            .pinned = window->m_pinned,
+            .pinned    = true,
         });
 
-        window->m_pinned = false;
+        window->m_state &= ~Desktop::View::WINDOW_STATE_PINNED;
         window->m_workspace.reset();
     }
 
@@ -508,7 +509,8 @@ void restorePinnedWindowPreviewState(const std::vector<SPinnedWindowPreviewState
             continue;
 
         state.window->m_workspace = state.workspace;
-        state.window->m_pinned    = state.pinned;
+        if (state.pinned)
+            state.window->m_state |= Desktop::View::WINDOW_STATE_PINNED;
     }
 }
 
@@ -519,19 +521,19 @@ CPinnedWindowPreviewGuard::~CPinnedWindowPreviewGuard() {
 }
 
 bool windowVisibleOnWorkspace(const PHLWINDOW& window, const PHLWORKSPACE& workspace) {
-    return window && workspace && window->m_workspace == workspace && window->m_isMapped && !window->isHidden() && !window->m_pinned;
+    return window && workspace && window->m_workspace == workspace && window->mapped() && !window->isHidden() && !(window->m_state & Desktop::View::WINDOW_STATE_PINNED);
 }
 
 void settleWorkspaceMoveAnimation(const PHLWINDOW& window) {
     if (!window)
         return;
 
-    window->alpha(Desktop::View::WINDOW_ALPHA_MOVE_TO_WORKSPACE)->resetAllCallbacks();
-    window->alpha(Desktop::View::WINDOW_ALPHA_MOVE_TO_WORKSPACE)->setValueAndWarp(1.F);
-    *window->alpha(Desktop::View::WINDOW_ALPHA_MOVE_TO_WORKSPACE) = 1.F;
-    window->alpha(Desktop::View::WINDOW_ALPHA_MOVE_FROM_WORKSPACE)->setValueAndWarp(1.F);
-    *window->alpha(Desktop::View::WINDOW_ALPHA_MOVE_FROM_WORKSPACE) = 1.F;
-    window->m_monitorMovedFrom                                      = -1;
+    window->presentation().alpha(Desktop::View::WINDOW_ALPHA_MOVE_TO_WORKSPACE)->resetAllCallbacks();
+    window->presentation().alpha(Desktop::View::WINDOW_ALPHA_MOVE_TO_WORKSPACE)->setValueAndWarp(1.F);
+    *window->presentation().alpha(Desktop::View::WINDOW_ALPHA_MOVE_TO_WORKSPACE) = 1.F;
+    window->presentation().alpha(Desktop::View::WINDOW_ALPHA_MOVE_FROM_WORKSPACE)->setValueAndWarp(1.F);
+    *window->presentation().alpha(Desktop::View::WINDOW_ALPHA_MOVE_FROM_WORKSPACE) = 1.F;
+    window->presentation().resetMonitorMovedFrom();
 }
 
 void settleWorkspaceMoveAnimations() {
@@ -539,8 +541,8 @@ void settleWorkspaceMoveAnimations() {
         if (!window)
             continue;
 
-        const bool movingWorkspace = window->m_monitorMovedFrom != -1 || window->alpha(Desktop::View::WINDOW_ALPHA_MOVE_TO_WORKSPACE)->isBeingAnimated() ||
-            window->alpha(Desktop::View::WINDOW_ALPHA_MOVE_FROM_WORKSPACE)->isBeingAnimated();
+        const bool movingWorkspace = window->presentation().movingFromMonitor() || window->presentation().alpha(Desktop::View::WINDOW_ALPHA_MOVE_TO_WORKSPACE)->isBeingAnimated() ||
+            window->presentation().alpha(Desktop::View::WINDOW_ALPHA_MOVE_FROM_WORKSPACE)->isBeingAnimated();
         if (!movingWorkspace)
             continue;
 
@@ -995,7 +997,7 @@ static std::pair<bool, int> getWorkspaceMethodForMonitor(PHLMONITOR monitor) {
 
     int methodStartID = monitor->activeWorkspaceID();
     if (!parsed.valid) {
-        Log::logger->log(Log::ERR, "[hyprexpo] invalid workspace_method for monitor {}: {} ({})", monitorName, configStr, parsed.error);
+        Log::logger->log(Log::ERR, Log::logFnName(), "[hyprexpo] invalid workspace_method for monitor {}: {} ({})", monitorName, configStr, parsed.error);
         return {true, methodStartID};
     }
 
@@ -1233,7 +1235,7 @@ COverview::COverview(PHLWORKSPACE startedOn_, PHLMONITOR monitor_, bool swipe_, 
             visibleWorkspaceIDs = *expandedWorkspaceIDs;
         else {
             visibleWorkspaceIDs = *Hyprexpo::expandDynamicWorkspaceIDs(visibleWorkspaceIDs, false, HyprexpoConfig::DYNAMIC_GRID_MAX_TILES);
-            Log::logger->log(Log::ERR, "[hyprexpo] fill_gaps range exceeds {} tiles; using sparse workspace IDs", HyprexpoConfig::DYNAMIC_GRID_MAX_TILES);
+            Log::logger->log(Log::ERR, Log::logFnName(), "[hyprexpo] fill_gaps range exceeds {} tiles; using sparse workspace IDs", HyprexpoConfig::DYNAMIC_GRID_MAX_TILES);
         }
 
         if (**PMRUSORT) {

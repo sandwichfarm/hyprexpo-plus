@@ -13,10 +13,10 @@
 #include <hyprland/src/debug/log/Logger.hpp>
 #include <hyprland/src/desktop/state/FocusState.hpp>
 #include <hyprland/src/desktop/state/GlobalWindowController.hpp>
-#include <hyprland/src/desktop/view/Window.hpp>
+#include <hyprland/src/desktop/view/window/Window.hpp>
 #include <hyprland/src/helpers/Color.hpp>
 #include <hyprland/src/output/Monitor.hpp>
-#include <hyprland/src/managers/KeybindManager.hpp>
+#include <hyprland/src/keybinds/Resolver.hpp>
 #include <hyprland/src/managers/SeatManager.hpp>
 #include <hyprland/src/managers/input/InputManager.hpp>
 #include <hyprland/src/managers/input/trackpad/GestureTypes.hpp>
@@ -141,7 +141,7 @@ static PHLWINDOW windowToBringFromWorkspace(const PHLWORKSPACE& workspace) {
     const auto& windows = Desktop::windowState()->windows();
     for (auto it = windows.rbegin(); it != windows.rend(); ++it) {
         const auto& window = *it;
-        if (!window || window->m_workspace != workspace || !window->m_isMapped || window->isHidden())
+        if (!window || window->m_workspace != workspace || !window->mapped() || window->isHidden())
             continue;
 
         return window;
@@ -444,6 +444,22 @@ static int luaKbSelectIndex(lua_State* L) {
     return luaDispatchResult(L, "hyprexpo.kb_selecti", onKbSelectIndexDispatcher(luaIntegerArg(L, 1, "hyprexpo.kb_selecti")));
 }
 
+static int luaMoveWindow(lua_State* L) {
+    return luaDispatchResult(L, "hyprexpo.move_window", onMovePreviewWindowDispatcher(luaStringArg(L, 1, "hyprexpo.move_window")));
+}
+
+static int luaScrollingDebug(lua_State* L) {
+    return luaDispatchResult(L, "hyprexpo.scrolling_debug", onScrollingDebugDispatcher(luaStringArg(L, 1, "hyprexpo.scrolling_debug")));
+}
+
+static int luaScrollingInputTest(lua_State* L) {
+    return luaDispatchResult(L, "hyprexpo.scrolling_input_test", onScrollingInputTestDispatcher(luaStringArg(L, 1, "hyprexpo.scrolling_input_test")));
+}
+
+static int luaScrollingMutationTest(lua_State* L) {
+    return luaDispatchResult(L, "hyprexpo.scrolling_mutation_test", onScrollingMutationTestDispatcher(luaStringArg(L, 1, "hyprexpo.scrolling_mutation_test")));
+}
+
 static int luaGesture(lua_State* L) {
     luaL_checktype(L, 1, LUA_TTABLE);
 
@@ -529,9 +545,9 @@ static SDispatchResult registerExpoGesture(int fingerCount, const std::string& d
     if (direction == TRACKPAD_GESTURE_DIR_NONE)
         return {.success = false, .error = std::format("invalid direction '{}'", directionName)};
 
-    uint32_t modMask = 0;
+    Input::ModifierMask modMask = Input::HL_MODIFIER_NONE;
     if (!mods.empty())
-        modMask = g_pKeybindManager->stringToModMask(mods);
+        modMask = Keybinds::modMaskFromString(mods);
 
     deltaScale = std::clamp(deltaScale, 0.1F, 10.F);
 
@@ -556,7 +572,7 @@ void disableExpoGestureRegistration() {
 }
 
 static void reportGestureConfigError(const std::string& error) {
-    Log::logger->log(Log::ERR, "[hyprexpo] {}", error);
+    Log::logger->log(Log::ERR, Log::logFnName(), "[hyprexpo] {}", error);
     HyprlandAPI::addNotification(PHANDLE, "[hyprexpo] " + error, CHyprColor{1.0, 0.2, 0.2, 1.0}, 5000);
 }
 
@@ -691,7 +707,7 @@ static SDispatchResult onScrollingDebugDispatcher(std::string arg) {
     if (!emission.validRequest)
         return {.success = false, .error = emission.error};
 
-    Log::logger->log(Log::INFO, "HYPREXPO_SCROLLING_DIAGNOSTIC {}", emission.json);
+    Log::logger->log(Log::INFO, Log::logFnName(), "HYPREXPO_SCROLLING_DIAGNOSTIC {}", emission.json);
     if (!emission.success)
         return {.success = false, .error = emission.error};
     return {};
@@ -709,7 +725,7 @@ static SDispatchResult onScrollingInputTestDispatcher(std::string arg) {
     const auto emission = OV->injectScrollingInput(arg);
     if (!emission)
         return {.success = false, .error = emission.error()};
-    Log::logger->log(Log::INFO, "HYPREXPO_SCROLLING_INPUT {}", *emission);
+    Log::logger->log(Log::INFO, Log::logFnName(), "HYPREXPO_SCROLLING_INPUT {}", *emission);
     return {};
 }
 
@@ -726,7 +742,7 @@ static SDispatchResult onScrollingMutationTestDispatcher(std::string arg) {
     if (!result)
         return {.success = false, .error = result.error()};
     const auto diagnostic = Hyprexpo::Scrolling::mutationDiagnosticJson(*result);
-    Log::logger->log(result->outcome == Hyprexpo::Scrolling::EMutationOutcome::RollbackFailed ? Log::ERR : Log::INFO,
+    Log::logger->log(result->outcome == Hyprexpo::Scrolling::EMutationOutcome::RollbackFailed ? Log::ERR : Log::INFO, Log::logFnName(),
                      "HYPREXPO_SCROLLING_MUTATION {}", diagnostic);
     if (result->outcome == Hyprexpo::Scrolling::EMutationOutcome::RollbackFailed || result->outcome == Hyprexpo::Scrolling::EMutationOutcome::Rejected)
         return {.success = false, .error = result->error};
@@ -773,5 +789,9 @@ void registerHyprexpoDispatchers() {
     HyprlandAPI::addLuaFunction(PHANDLE, "hyprexpo", "kb_selectn", luaKbSelectNumber);
     HyprlandAPI::addLuaFunction(PHANDLE, "hyprexpo", "kb_select", luaKbSelectToken);
     HyprlandAPI::addLuaFunction(PHANDLE, "hyprexpo", "kb_selecti", luaKbSelectIndex);
+    HyprlandAPI::addLuaFunction(PHANDLE, "hyprexpo", "move_window", luaMoveWindow);
+    HyprlandAPI::addLuaFunction(PHANDLE, "hyprexpo", "scrolling_debug", luaScrollingDebug);
+    HyprlandAPI::addLuaFunction(PHANDLE, "hyprexpo", "scrolling_input_test", luaScrollingInputTest);
+    HyprlandAPI::addLuaFunction(PHANDLE, "hyprexpo", "scrolling_mutation_test", luaScrollingMutationTest);
     HyprlandAPI::addLuaFunction(PHANDLE, "hyprexpo", "gesture", luaGesture);
 }

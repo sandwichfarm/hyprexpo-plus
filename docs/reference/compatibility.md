@@ -56,7 +56,8 @@ and loaded against both supported releases before the pins moved.
 See [feature integration](./feature-integration.md) for the historical integration
 checkpoints, release revalidation and remaining test boundaries.
 
-The flake has an explicit v0.56.2 reference. Nix users should keep the plugin's
+The `master` flake has an explicit v0.56.2 reference; this development candidate
+pins `34eb03bd8da01024596c367fba66485a8c9b8ca7`. Nix users should keep the plugin's
 Hyprland input aligned with their system input through `default.nix` and the
 Hyprland plugin packaging path. Overrides must select a supported release;
 following an arbitrary development revision is not a compatibility guarantee.

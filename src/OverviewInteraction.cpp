@@ -9,7 +9,7 @@
 #include <hyprland/src/pointer/cursor/CursorShapeOverrideController.hpp>
 #include <hyprland/src/managers/input/InputManager.hpp>
 #include <hyprland/src/managers/eventLoop/EventLoopManager.hpp>
-#include <hyprland/src/managers/KeybindManager.hpp>
+#include <hyprland/src/keybinds/Manager.hpp>
 #include <hyprland/src/state/WorkspaceState.hpp>
 #include <hyprland/src/config/shared/actions/ConfigActions.hpp>
 #include <algorithm>
@@ -322,7 +322,7 @@ bool COverview::finishWindowDrag() {
 
             const auto TARGETWS = TARGETOV->ensureWorkspaceForTile(TARGET);
             if (TARGETWS && TARGETWS->m_monitor.lock() != TARGETMON)
-                Log::logger->log(Log::ERR, "[hyprexpo] rejected drag target workspace on the wrong monitor");
+                Log::logger->log(Log::ERR, Log::logFnName(), "[hyprexpo] rejected drag target workspace on the wrong monitor");
             else if (windowVisibleOnWorkspace(g_overviewDrag.window, SOURCEWS) && TARGETWS && TARGETWS != SOURCEWS) {
                 const int64_t SOURCEWORKSPACEID = SOURCEOV->images[SOURCE].workspaceID;
                 const int64_t TARGETWORKSPACEID = TARGETOV->images[TARGET].workspaceID;
@@ -657,7 +657,7 @@ void COverview::onWindowMoveToWorkspace(const PHLWINDOW& window, const PHLWORKSP
         return;
 
     const bool movedOnOverviewMonitor = window->m_monitor == monitor || (window->m_workspace && window->m_workspace->m_monitor == monitor) || (workspace && workspace->m_monitor == monitor);
-    if (!Hyprexpo::shouldAbortOverviewCloseForWorkspaceMove(window->m_pinned, movedOnOverviewMonitor))
+    if (!Hyprexpo::shouldAbortOverviewCloseForWorkspaceMove((window->m_state & Desktop::View::WINDOW_STATE_PINNED) != Desktop::View::WINDOW_STATE_NONE, movedOnOverviewMonitor))
         return;
 
     externalWorkspaceMoveDuringClose = true;
@@ -760,7 +760,7 @@ void enterOverviewSubmap(bool& submapActive) {
         //
         // The capture is global, not per-overview: only the first overview to open sees
         // the user's real submap. The others would capture "hyprexpo" and restore that.
-        g_previousSubmap = g_pKeybindManager->getCurrentSubmap().name;
+        g_previousSubmap = Keybinds::mgr()->currentSubmap();
         // switch to a dedicated submap for hyprexpo navigation
         (void)Config::Actions::setSubmap("hyprexpo");
     }

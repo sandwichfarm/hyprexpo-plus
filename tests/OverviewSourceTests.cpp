@@ -1,6 +1,8 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <tuple>
+#include <vector>
 
 namespace {
 
@@ -171,7 +173,7 @@ int main() {
 
     const auto enterSubmap = extractFunction(interactionSource, "void enterOverviewSubmap(bool& submapActive) {");
     expect(!enterSubmap.empty(), "keyboard navigation submap entry function exists");
-    const auto captureSubmapPos = enterSubmap.find("g_previousSubmap = g_pKeybindManager->getCurrentSubmap().name;");
+    const auto captureSubmapPos = enterSubmap.find("g_previousSubmap = Keybinds::mgr()->currentSubmap();");
     const auto firstSubmapRef   = enterSubmap.find("if (g_submapRefs++ == 0)");
     const auto shareSubmapPos   = captureSubmapPos;
     const auto enterSubmapPos   = enterSubmap.find("Config::Actions::setSubmap(\"hyprexpo\");");
@@ -211,7 +213,7 @@ int main() {
     const auto workspaceMoveHandler = extractFunction(interactionSource, "void COverview::onWindowMoveToWorkspace(");
     expect(!workspaceMoveHandler.empty(), "workspace-move close handler exists");
     const auto monitorRelevancePos = workspaceMoveHandler.find("const bool movedOnOverviewMonitor");
-    const auto classifierPos       = workspaceMoveHandler.find("Hyprexpo::shouldAbortOverviewCloseForWorkspaceMove(window->m_pinned, movedOnOverviewMonitor)");
+    const auto classifierPos       = workspaceMoveHandler.find("Hyprexpo::shouldAbortOverviewCloseForWorkspaceMove((window->m_state & Desktop::View::WINDOW_STATE_PINNED) != Desktop::View::WINDOW_STATE_NONE, movedOnOverviewMonitor)");
     const auto abortFlagPos        = workspaceMoveHandler.find("externalWorkspaceMoveDuringClose = true;");
     const auto workspaceDamagePos  = workspaceMoveHandler.find("damage();", abortFlagPos);
     const auto scheduleFramePos    = workspaceMoveHandler.find("monitor->scheduleFrame();", workspaceDamagePos);
@@ -609,39 +611,47 @@ int main() {
                incompleteBlock.find("close(") == std::string::npos,
            "incomplete swipe still resets animation state and leaves the overview open");
 
-    expect(source.find("#include <hyprland/src/desktop/view/Window.hpp>") != std::string::npos &&
-               source.find("#include <hyprland/src/desktop/view/window/Window.hpp>") == std::string::npos &&
-               source.find("#include <hyprland/src/desktop/view/window/WindowPresentation.hpp>") == std::string::npos,
-           "overview capture uses the tagged Hyprland release window header");
-    expect(source.find("window->m_isMapped") != std::string::npos &&
-               source.find("window->m_pinned") != std::string::npos &&
-               source.find("window->alpha(") != std::string::npos &&
-               source.find("window->m_monitorMovedFrom != -1") != std::string::npos &&
-               source.find("window->m_monitorMovedFrom                                      = -1;") != std::string::npos,
-           "overview capture uses release mapped, pinned, alpha, and moved-monitor APIs");
-    expect(source.find("window->mapped()") == std::string::npos && source.find("WINDOW_STATE_PINNED") == std::string::npos &&
-               source.find("->presentation()") == std::string::npos,
-           "overview capture does not reintroduce git-only Hyprland window APIs");
+    expect(source.find("#include <hyprland/src/desktop/view/window/Window.hpp>") != std::string::npos &&
+               source.find("#include <hyprland/src/desktop/view/window/WindowPresentation.hpp>") != std::string::npos,
+           "overview capture uses the pinned development window and presentation headers");
+    expect(source.find("window->mapped()") != std::string::npos &&
+               source.find("WINDOW_STATE_PINNED") != std::string::npos &&
+               source.find("window->presentation().alpha(") != std::string::npos &&
+               source.find("window->presentation().movingFromMonitor()") != std::string::npos &&
+               source.find("window->presentation().resetMonitorMovedFrom()") != std::string::npos,
+           "overview capture retains mapped, pinned, alpha, and moved-monitor behavior on development APIs");
 
     const auto applyPinnedState = extractFunction(source, "std::vector<SPinnedWindowPreviewState> applyPinnedWindowPreviewState(");
     const auto restorePinnedState = extractFunction(source, "void restorePinnedWindowPreviewState(");
-    expect(applyPinnedState.find(".pinned = window->m_pinned") != std::string::npos &&
-               applyPinnedState.find("window->m_pinned = false") != std::string::npos &&
+    expect(applyPinnedState.find("!(window->m_state & Desktop::View::WINDOW_STATE_PINNED)") != std::string::npos &&
+               applyPinnedState.find(".pinned    = true") != std::string::npos &&
+               applyPinnedState.find("window->m_state &= ~Desktop::View::WINDOW_STATE_PINNED") != std::string::npos &&
                applyPinnedState.find("window->m_workspace.reset()") != std::string::npos,
-           "pinned preview suppression saves and clears pinned state and temporarily detaches the workspace");
+           "pinned preview suppression saves only pinned windows, clears their pinned bit and detaches their workspace");
     expect(restorePinnedState.find("state.window->m_workspace = state.workspace") != std::string::npos &&
-               restorePinnedState.find("state.window->m_pinned    = state.pinned") != std::string::npos,
-           "pinned preview suppression restores workspace ownership and the saved pinned state");
+               restorePinnedState.find("if (state.pinned)") != std::string::npos &&
+               restorePinnedState.find("state.window->m_state |= Desktop::View::WINDOW_STATE_PINNED") != std::string::npos,
+           "pinned preview suppression restores workspace and pinned bit without overwriting other state flags");
 
-    expect(dispatchersSource.find("uint32_t modMask = 0") != std::string::npos &&
-               dispatchersSource.find("g_pKeybindManager->stringToModMask(mods)") != std::string::npos &&
-               dispatchersSource.find("Keybinds::modMaskFromString") == std::string::npos,
-           "gesture registration uses the tagged Hyprland release modifier parser and mask type");
-    expect(interactionSource.find("#include <hyprland/src/managers/KeybindManager.hpp>") != std::string::npos &&
-               interactionSource.find("g_pKeybindManager->getCurrentSubmap().name") != std::string::npos &&
-               interactionSource.find("#include <hyprland/src/keybinds/Manager.hpp>") == std::string::npos &&
-               interactionSource.find("Keybinds::mgr()") == std::string::npos,
-           "submap ownership uses the tagged Hyprland release keybind manager API");
+    expect(dispatchersSource.find("Input::ModifierMask modMask = Input::HL_MODIFIER_NONE") != std::string::npos &&
+               dispatchersSource.find("Keybinds::modMaskFromString(mods)") != std::string::npos,
+           "gesture registration uses the pinned development modifier parser and mask type");
+    expect(interactionSource.find("#include <hyprland/src/keybinds/Manager.hpp>") != std::string::npos &&
+               interactionSource.find("Keybinds::mgr()->currentSubmap()") != std::string::npos,
+           "submap ownership captures the exact active submap through the development keybind manager API");
+
+    for (const auto& [luaName, wrapper, handler] : std::vector<std::tuple<std::string, std::string, std::string>>{
+             {"move_window", "luaMoveWindow", "onMovePreviewWindowDispatcher"},
+             {"scrolling_debug", "luaScrollingDebug", "onScrollingDebugDispatcher"},
+             {"scrolling_input_test", "luaScrollingInputTest", "onScrollingInputTestDispatcher"},
+             {"scrolling_mutation_test", "luaScrollingMutationTest", "onScrollingMutationTestDispatcher"},
+         }) {
+        const auto body = extractFunction(dispatchersSource, "static int " + wrapper + "(");
+        expectContains(body, "luaDispatchResult(L, \"hyprexpo." + luaName + "\", " + handler + "(luaStringArg(L, 1, \"hyprexpo." + luaName + "\")))",
+                       luaName + " Lua path shares string validation, native handler and error propagation");
+        expectContains(dispatchersSource, "HyprlandAPI::addLuaFunction(PHANDLE, \"hyprexpo\", \"" + luaName + "\", " + wrapper + ")",
+                       luaName + " remains callable when upstream disables legacy dispatcher registration");
+    }
 
     const auto exitFunction = extractFunction(mainSource, "APICALL EXPORT void PLUGIN_EXIT(");
     expect(!exitFunction.empty(), "PLUGIN_EXIT exists");

@@ -113,7 +113,8 @@ assert_event() {
 }
 
 assert_case() {
-    local name=$1 json=$2 expected=${expectations[$name]}
+    local name=$1 json=$2
+    local expected=${expectations[$name]}
     local final records final_state owning_touch has_drop
     final=${expected%%|*}; records=${expected#*|}
     IFS=, read -r final_state owning_touch has_drop <<<"$final"
@@ -129,7 +130,8 @@ assert_case() {
 }
 
 run_oracle_case() {
-    local name=$1 request_id="$name-requestId"
+    local name=$1
+    local request_id="$name-requestId"
     local json
     json=$("$repo_root/ScrollingInputOracle" "$request_id|${cases[$name]}")
     assert_case "$name" "$json"
@@ -150,6 +152,8 @@ source_contract() {
         printf 'oracle %s\n' "$name"
         run_oracle_case "$name"
     done
+    # Runtime entry has no dynamically scoped loop variable named "name".
+    (unset name; run_oracle_case touch-cancel-pending)
     printf 'scrolling input behavioral oracle PASS (%s cases)\n' "${#cases[@]}"
 }
 
@@ -168,7 +172,7 @@ debug_value=$(hyprctl getoption plugin:hyprexpo:scrolling_input_debug -j | jq -r
 [[ $debug_value == 1 ]] || { printf '%s\n' 'plugin:hyprexpo:scrolling_input_debug must be 1' >&2; exit 1; }
 request_id="$case_name-requestId"
 log_file="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/hypr/$HYPRLAND_INSTANCE_SIGNATURE/hyprland.log"
-hyprctl dispatch hyprexpo:scrolling_input_test "$request_id|${cases[$case_name]}" >/dev/null
+hyprctl eval "hl.plugin.hyprexpo.scrolling_input_test(\"$request_id|${cases[$case_name]}\")" >/dev/null
 for _ in {1..50}; do
     record=$(rg -F "HYPREXPO_SCROLLING_INPUT {\"requestId\":\"$request_id\"" "$log_file" | tail -1 || true)
     if [[ -n $record ]]; then

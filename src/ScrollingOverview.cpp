@@ -241,7 +241,7 @@ void CScrollingOverview::applyInputEffects(const SInputEffects& effects, const S
                 const auto result = moveScrollingTarget(sourceRow->workspace, destinationRow ? destinationRow->workspace : PHLWORKSPACE{}, MON, request);
                 const auto diagnostic = mutationDiagnosticJson(result);
                 if (result.outcome == EMutationOutcome::RollbackFailed) {
-                    Log::logger->log(Log::ERR, "HYPREXPO_SCROLLING_MUTATION {}", diagnostic);
+                    Log::logger->log(Log::ERR, Log::logFnName(), "HYPREXPO_SCROLLING_MUTATION {}", diagnostic);
                     const auto generation = m_sessionGeneration;
                     const auto monitorKey = overviewMonitorKey(m_monitor.lock());
                     setClosing(true);
@@ -250,7 +250,7 @@ void CScrollingOverview::applyInputEffects(const SInputEffects& effects, const S
                             OV->close(false);
                     });
                 } else {
-                    Log::logger->log(Log::INFO, "HYPREXPO_SCROLLING_MUTATION {}", diagnostic);
+                    Log::logger->log(Log::INFO, Log::logFnName(), "HYPREXPO_SCROLLING_MUTATION {}", diagnostic);
                     switch (result.outcome) {
                         case EMutationOutcome::Committed:
                         case EMutationOutcome::RolledBack:

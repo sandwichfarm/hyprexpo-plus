@@ -33,6 +33,11 @@ ____
 
 ## Branches and Releases
 
+This development candidate pins Hyprland
+`34eb03bd8da01024596c367fba66485a8c9b8ca7`. Use the
+[development installation guide](docs/guides/development-installation.md) for
+its matching source, dependencies, and validation boundaries.
+
 `master` is the default branch for supported, released Hyprland versions.
 The separate `hyprland-git` track targets explicitly tested upstream
 development commits. Compatible fixes flow from `master` into the chase branch;
@@ -137,9 +142,10 @@ cmake --build build
 Nix users should build HyprExpo through the Nix Hyprland plugin path instead of mixing a `hyprpm` artifact into a Nix-managed Hyprland session. This repository includes `default.nix`, which uses `hyprlandPlugins.mkHyprlandPlugin` so the plugin follows the Hyprland input supplied by the caller.
 
 Hyprland plugins are ABI-sensitive. Keep the plugin build and running Hyprland revision aligned.
-The flake defaults to the v0.56.2 release. Override its Hyprland input to the
-same supported release used by your system; an unpinned Hyprland-git input is
-not covered by the release compatibility checks.
+The `master` flake defaults to v0.56.2. This development candidate instead
+pins the upstream commit above. Select a compatible plugin branch and align
+its Hyprland input with the running system; overriding development source to
+a released Hyprland input does not make the APIs compatible.
 
 ## Quick Config
 

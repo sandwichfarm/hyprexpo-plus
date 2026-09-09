@@ -15,7 +15,7 @@
 namespace {
 
 void notifyScrollingFailure(const std::string& message) {
-    Log::logger->log(Log::ERR, "[hyprexpo] {}", message);
+    Log::logger->log(Log::ERR, Log::logFnName(), "[hyprexpo] {}", message);
     HyprlandAPI::addNotification(PHANDLE, "[hyprexpo] " + message, CHyprColor{1.0, 0.2, 0.2, 1.0}, 5000);
 }
 

@@ -143,7 +143,7 @@ int scrollingThumbnailBudgetMultiplier() {
         std::scoped_lock lock{g_budgetLogMutex};
         const auto generation = g_budgetGeneration.load(std::memory_order_relaxed);
         if (g_lastLoggedBudgetGeneration != generation) {
-            Log::logger->log(Log::ERR, "[hyprexpo] scrolling_thumbnail_budget {} is outside {}..{}; clamping to {}", raw, HyprexpoConfig::SCROLLING_THUMBNAIL_BUDGET_MIN,
+            Log::logger->log(Log::ERR, Log::logFnName(), "[hyprexpo] scrolling_thumbnail_budget {} is outside {}..{}; clamping to {}", raw, HyprexpoConfig::SCROLLING_THUMBNAIL_BUDGET_MIN,
                              HyprexpoConfig::SCROLLING_THUMBNAIL_BUDGET_MAX, clamped);
             g_lastLoggedBudgetGeneration = generation;
         }

@@ -3,7 +3,8 @@
 #include <hyprland/src/desktop/Workspace.hpp>
 #include <hyprland/src/desktop/state/GlobalWindowController.hpp>
 #include <hyprland/src/desktop/state/FocusState.hpp>
-#include <hyprland/src/desktop/view/Window.hpp>
+#include <hyprland/src/desktop/view/window/Window.hpp>
+#include <hyprland/src/desktop/view/window/WindowMetadata.hpp>
 #include <hyprland/src/layout/algorithm/Algorithm.hpp>
 #include <hyprland/src/layout/algorithm/tiled/scrolling/ScrollingAlgorithm.hpp>
 #include <hyprland/src/layout/supplementary/WorkspaceAlgoMatcher.hpp>
@@ -82,12 +83,12 @@ STargetSnapshot copyTarget(const SP<Layout::ITarget>& target, const CBox& layout
         .proportion = proportion,
         .targetFingerprint = fingerprint(target),
         .windowFingerprint = fingerprint(window),
-        .windowStableID = window ? window->m_stableID : 0,
+        .windowStableID = window ? window->metadata().stableID() : 0,
         .layoutBox = layoutBox,
         .group = target->type() == Layout::TARGET_TYPE_GROUP,
         .floating = target->floating(),
         .fullscreen = window && Fullscreen::controller() && Fullscreen::controller()->isFullscreen(window),
-        .pinned = window && window->m_pinned,
+        .pinned = window && (window->m_state & Desktop::View::WINDOW_STATE_PINNED),
         .visible = visible,
         .targetRef = target,
         .windowRef = window,
